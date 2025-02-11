@@ -1,0 +1,30 @@
+{"intents":[
+    { "tag": "saudacao",
+      "patterns":["Ola","Opa","Oi", "tudo bem","como vai"],
+      "responses": ["Olá, como posso te ajudar?"]
+    },
+    { "tag": "despedida",
+      "patterns":["valeu","tchau","Obrigado","fui","beleza"],
+      "responses": ["Obrigado por utilizar o chatbot!", 
+      "Fico a disposição caso tenha mais dúvidas"]
+    },
+    { "tag": "submissao PIPE",
+      "patterns":["Onde posso fazer a submissão da minha proposta PIPE?", "Como faço para submeter minha proposta PIPE?"],
+      "responses": ["A submissão da proposta deve ser feita através do site SAGe, \nno menu PIPE. Lá você encontrará o formulário de submissão."]
+    },
+    {
+      "tag": "limite de aplicacao PIPE",
+      "patterns":["A submissão da minha proposta ao PIPE tem um prazo limite?", "Até quando, posso submeter minha proposta PIPE?"],
+      "responses": ["Pode ser feita a qualquer momento ao longo do ano."]
+    },
+    {
+      "tag": "etapas PIPE",
+      "patterns":["Quais são as etapas do PIPE?"],
+      "responses": ["O programa PIPE possui quatro etapas: Fase 1, que avalia a viabilidade técnico-científica da proposta (até 9 meses, R$ 300.000); \nFase 2, dedicada à execução da pesquisa (até 24 meses, R$ 1.500.000); PIPE Invest, que acelera a chegada ao mercado de projetos da Fase 2 com investidores externos (até 24 meses, R$ 1.500.000);\n e Fase 3, voltada ao desenvolvimento comercial e industrial de inovações, com ou sem apoio prévio da FAPESP."]
+    },
+    { "tag": "empresa PIPE",
+      "patterns": ["Preciso ter uma empresa para submeter uma proposta PIPE?", "É necessário ter uma empresa para participar do PIPE?"],
+      "responses": ["Não. A FAPESP analisa propostas de empresas ainda não constituídas. Empresas startup ainda não constituídas legalmente são incentivadas a submeter. \nNos casos em que a proposta for recomendada, o proponente deverá então abrir formalmente a empresa antes da concessão da proposta."]
+    }
+  ]
+  }
