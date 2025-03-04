@@ -10,11 +10,7 @@ myChatBot = ChatBot()
 #criar o modelo
 myChatBot.createModel()
 
-
-
-
 print("Bem vindo ao Chatbot")
-
 
 pergunta = input("como posso te ajudar?")
 resposta, intencao = myChatBot.chatbot_response(pergunta)
