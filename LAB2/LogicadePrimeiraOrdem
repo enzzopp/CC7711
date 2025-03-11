@@ -1,0 +1,27 @@
+progenitor(antonita,joão). progenitor(antonita,clara). progenitor(antonita,francisco). progenitor(antonita,valeria). progenitor(antonita,ana). progenitor(pietro,joão). progenitor(pietro,clara). progenitor(pietro,francisco). progenitor(pietro,valeria). progenitor(pietro,ana).
+
+progenitor(ana,helena). progenitor(ana,joana). progenitor(joão,mario).
+
+progenitor(helena,carlos). progenitor(mario,carlos).
+
+progenitor(clara,pietro_junior). progenitor(clara,enzo).
+
+progenitor(jacynto,francisca). progenitor(jacynto,antonia). progenitor(claudia,francisca). progenitor(claudia,antonia).
+
+progenitor(luzia,jacynto). progenitor(pablo,jacynto).
+
+sexo(antonita,feminino). sexo(joão,masculino). sexo(pietro,masculino). sexo(clara,feminino). sexo(francisco,masculino). sexo(valeria,feminino). sexo(ana,feminino). sexo(helena,feminino). sexo(joana,feminino). sexo(mario,masculino). sexo(carlos,masculino). sexo(fabiana,feminino). sexo(francisca,feminino). sexo(antonia,feminino). sexo(claudia,feminino). sexo(luzia,feminino). sexo(pietro_junior,masculino). sexo(enzo,masculino). sexo(jacynto,masculino). sexo(pablo,masculino).
+
+irmao(X, Y) :- progenitor(A, X), progenitor(A, Y), X==Y.
+
+avo_m(X, Y) :- progenitor(X, A), progenitor(A, Y), sexo(X, masculino), X==Y. avo_f(X, Y) :- progenitor(X, A), progenitor(A, Y), sexo(X, feminino), X==Y.
+
+tio(X, Y) :- progenitor(A, Y), irmao(A, X), sexo(X, masculino), X==Y. tia(X, Y) :- progenitor(A, Y), irmao(A, X), sexo(X, feminino), X==Y.
+
+primo(X, Y) :- tio(A, Y), progenitor(A, X), sexo(X, masculino), X==Y. primo(X, Y) :- tia(A, Y), progenitor(A, X), sexo(X, masculino), X==Y.
+
+prima(X, Y) :- tio(A, Y), progenitor(A, X), sexo(X, feminino), X==Y. prima(X, Y) :- tia(A, Y), progenitor(A, X), sexo(X, feminino), X==Y.
+
+descendente(X, Y) :- progenitor(X,Y). descendente(X, Y) :- progenitor(X,A), descendente(A, Y).
+
+ascendente(X, Y) :- progenitor(Y,X). ascendente(X, Y) :- progenitor(Y,A), descendente(A, X).
