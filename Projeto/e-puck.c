@@ -21,7 +21,7 @@
  */
 
 #include <stdio.h>
-
+#include <stdlib.h>
 #include <webots/robot.h>
 
 #include <webots/motor.h>
@@ -97,6 +97,24 @@ void virar_robo_esquerda(WbDeviceTag MotorEsquerdo, WbDeviceTag MotorDireito)
     parar_robo(MotorEsquerdo, MotorDireito);
 }
 
+int sortear_direcao()
+{
+
+    int direcao = rand() % 2;
+    int direcao_sort = 0; // Variável para armazenar a direção sorteada
+
+    if (direcao == 0)
+    {
+        direcao_sort = 1;
+    }
+    else
+    {
+        direcao_sort = 0;
+    }
+
+    return direcao_sort; // Retorna a direção sorteada (0 ou 1)
+}
+
 int main(int argc, char **argv)
 {
 
@@ -109,6 +127,8 @@ int main(int argc, char **argv)
     double LeituraSensorProx[QtddSensoresProx];
 
     double AceleradorDireito = 1.0, AceleradorEsquerdo = 1.0;
+
+    char *direcao_sort; // Variável para armazenar a direção sorteada
 
     /* necessary to initialize webots stuff */
 
@@ -177,6 +197,8 @@ int main(int argc, char **argv)
 
     wb_led_set(Leds[0], -1);
 
+    direcao_sort = sortear_direcao(); // Sorteia a direção inicial (0 ou 1)
+
     while (wb_robot_step(TIME_STEP) != -1)
     {
 
@@ -184,18 +206,33 @@ int main(int argc, char **argv)
             texto[i] = 0;
 
         Sensor_FrontalDireito = wb_distance_sensor_get_value(SensorProx[0]) - 60;
-        //  sprintf(texto, "%s|%d: %5.2f  ", texto, 0, Sensor_FrontalDireito);
+         sprintf(texto, "%s|%d: %5.2f  ", texto, 0, Sensor_FrontalDireito);
 
         Sensor_FrontalEsquerdo = wb_distance_sensor_get_value(SensorProx[7]) - 60;
-        //  sprintf(texto, "%s|%d: %5.2f  ", texto, 7, Sensor_FrontalEsquerdo);
+         sprintf(texto, "%s|%d: %5.2f  ", texto, 7, Sensor_FrontalEsquerdo);
 
         if (Sensor_FrontalDireito >= 170 || Sensor_FrontalEsquerdo >= 170)
         {
-
-            parar_robo(MotorEsquerdo, MotorDireito);
-            printf("Parar\n");
-            virar_robo_180_direita(MotorEsquerdo, MotorDireito);
-            printf("Virar\n");
+            if (direcao_sort == 1)
+            {
+                parar_robo(MotorEsquerdo, MotorDireito);
+                printf("Parar\n");
+                virar_robo_direita(MotorEsquerdo, MotorDireito);
+                andar_robo_frente(MotorEsquerdo, MotorDireito);
+                printf("Virar\n");
+                virar_robo_direita(MotorEsquerdo, MotorDireito);
+                direcao_sort = 0;
+            }
+            else
+            {
+                parar_robo(MotorEsquerdo, MotorDireito);
+                printf("Parar\n");
+                virar_robo_esquerda(MotorEsquerdo, MotorDireito);
+                andar_robo_frente(MotorEsquerdo, MotorDireito);
+                printf("Virar\n");
+                virar_robo_esquerda(MotorEsquerdo, MotorDireito);
+                direcao_sort = 1;
+            }
         }
         else
         {
