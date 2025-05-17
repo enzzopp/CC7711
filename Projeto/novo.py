@@ -38,7 +38,7 @@ def get_caixas(supervisor, num_caixas):
     return caixas, posicoes_iniciais
 
 # Função para verificar se as caixas se moveram após tentativa de empurrão
-def verificar_movimento_caixas(caixas, posicoes_iniciais):
+def verificar_movimento_caixas(caixas, posicoes_iniciais, tolerancia=0.01):
     posicoes_finais = {}
 
     for i, caixa in enumerate(caixas):
@@ -55,7 +55,7 @@ def verificar_movimento_caixas(caixas, posicoes_iniciais):
         dy = yf - yi
         dist = math.sqrt(dx**2 + dy**2)
 
-        if dist == 0:
+        if dist < tolerancia:
             print(f"{nome} é PESADA (deslocamento {dist:.4f})")
         else:
             print(f"{nome} é LEVE (deslocamento {dist:.4f})")
@@ -84,8 +84,18 @@ def ler_sensores_proximidade(sensores):
         leituras.append(valor)
     return leituras
 
-# funcao de controle de movimento
-def controlar_movimento(robo_node, caixa_node, sensores, motor_esq, motor_dir, last_distance=0):
+# Função para controlar o movimento do robô
+# Armazena a última distância entre chamadas (sem alterar outras funções)
+ultima_distancia = [float('inf')]
+
+# Armazena a última distância entre chamadas
+ultima_distancia = [float('inf')]
+
+# Função para controlar o movimento do robô
+# Armazena estado interno entre chamadas
+evasao_contador = [0]  # novo: controle de evasão
+
+def controlar_movimento(robo_node, caixa_node, sensores, motor_esq, motor_dir, limite_sensor=150):
     # Posição e distância
     pos_robo = robo_node.getField("translation").getSFVec3f()
     pos_caixa = caixa_node.getPosition()
@@ -104,45 +114,50 @@ def controlar_movimento(robo_node, caixa_node, sensores, motor_esq, motor_dir, l
 
     # Leitura dos sensores
     leituras = ler_sensores_proximidade(sensores)
-    frente = (leituras[0] + leituras[7]) / 2
-    direita = sum(leituras[1:4]) / 3
-    esquerda = sum(leituras[4:7]) / 3
+    frente = leituras[0] + leituras[7]
+    direita = sum(leituras[1:4])
+    esquerda = sum(leituras[4:7])
+    progresso = distancia < ultima_distancia[0] - 0.003
+    ultima_distancia[0] = distancia
 
-    print(f"Frente: {frente:.2f}, Direita: {direita:.2f}, Esquerda: {esquerda:.2f}")
+    # evasão de obstáculo ---
+    if evasao_contador[0] > 0:
+        evasao_contador[0] -= 1
+        motor_esq.setVelocity(-1.5)
+        motor_dir.setVelocity(1.5)
+        print("Executando evasão temporária...")
+        return
 
     # Detectou obstáculo à frente
-    if frente > LIMITE_SENSOR:
+    if frente > limite_sensor:
         # inicia evasão por alguns ciclos
+        evasao_contador[0] = 5  # por ex., 5 * TIME_STEP = ~2.5s
         if direita > esquerda:
-            motor_esq.setVelocity(MOVER * -1.5)
-            motor_dir.setVelocity(MOVER * 1.5)
+            motor_esq.setVelocity(-1.5)
+            motor_dir.setVelocity(1.5)
         else:
-            motor_esq.setVelocity(MOVER * 1.5)
-            motor_dir.setVelocity(MOVER * -1.5)
-        print("Obstáculo a frente! Iniciando evasão...")
+            motor_esq.setVelocity(1.5)
+            motor_dir.setVelocity(-1.5)
+        print("Obstáculo detectado! Iniciando evasão...")
         return
-    
-    #Detectou obstáculo à direita
-    if direita > LIMITE_SENSOR:
-        motor_esq.setVelocity(MOVER * -1.5)
-        motor_dir.setVelocity(MOVER * 1.5)
-        print("Obstáculo à direita! Iniciando evasão...")
-        return
-    
-    # Detectou obstáculo à esquerda
-    if esquerda > LIMITE_SENSOR:
-        motor_esq.setVelocity(MOVER * 1.5)
-        motor_dir.setVelocity(MOVER * -1.5)
-        print("Obstáculo à esquerda! Iniciando evasão...")
-        return
-    
+
     # Gira totalmente se de costas
     if abs(erro) > 2.5:
         giro = 2.5 if erro > 0 else -2.5
-        motor_esq.setVelocity(MOVER * -giro)
-        motor_dir.setVelocity(MOVER * giro)
+        motor_esq.setVelocity(-giro)
+        motor_dir.setVelocity(giro)
         print("Giro completo: estava de costas.")
         delay(supervisor, TIME_STEP, 500)
+        return
+
+    # Corrige se mal orientado e parado
+    tolerancia_erro = 2.0 if distancia > 0.4 else 2.5
+    if abs(erro) > tolerancia_erro and not progresso:
+        giro = 2.0 if erro > 0 else -2.0
+        motor_esq.setVelocity(-giro)
+        motor_dir.setVelocity(giro)
+        print("Corrigindo rotação sem progresso.")
+        delay(supervisor, TIME_STEP, 0)
         return
 
     # Alinhado ou progredindo: navegação proporcional adaptativa
@@ -157,13 +172,13 @@ def controlar_movimento(robo_node, caixa_node, sensores, motor_esq, motor_dir, l
         vel_e = max(min(v_base - ajuste, MAX_VELOCIDADE), -MAX_VELOCIDADE)
         vel_d = max(min(v_base + ajuste, MAX_VELOCIDADE), -MAX_VELOCIDADE)
 
-    motor_esq.setVelocity(MOVER * vel_e)
-    motor_dir.setVelocity(MOVER * vel_d)
+    motor_esq.setVelocity(vel_e)
+    motor_dir.setVelocity(vel_d)
 
 # delay 
-def delay(supervisor, TIME_STEP, time_milisec="RANDOM"):
+def delay(supervisor, TIME_STEP, time_milisec=0):
 
-    if time_milisec == "RANDOM":
+    if time_milisec == 0:
         random_time = random.randint(1, 5)
         time_milisec = random_time * 100  # converte para milissegundos
 
@@ -173,8 +188,11 @@ def delay(supervisor, TIME_STEP, time_milisec="RANDOM"):
     while supervisor.getTime() - init_time < time_target:
         supervisor.step(TIME_STEP)
 
+    
+
+
 # Função para navegar até a caixa
-def navigate_to_box(caixa_node, robo_node, sensores, motor_esq, motor_dir):
+def navigate_to_box(caixa_node, robo_node, sensores, motor_esq, motor_dir, tolerancia=0.10):
     pos_robo = robo_node.getField("translation").getSFVec3f()
     pos_caixa = caixa_node.getPosition()
 
@@ -186,9 +204,9 @@ def navigate_to_box(caixa_node, robo_node, sensores, motor_esq, motor_dir):
     distancia = math.sqrt(dx**2 + dy**2)
     print(f"Distância até a caixa: {distancia:.2f}")
 
-    if round(distancia, 2) <= TOLERANCIA_DISTANCIA:
-        motor_esq.setVelocity(MOVER * 0.0)
-        motor_dir.setVelocity(MOVER * 0.0)
+    if round(distancia, 2) <= tolerancia:
+        motor_esq.setVelocity(0.0)
+        motor_dir.setVelocity(0.0)
         print("Robo parou.")
         return True  # Chegou ao destino
 
@@ -202,15 +220,15 @@ def success_navigate_to_box(caixa_node, robo_node, sensores, motor_esq, motor_di
 # Função para empurrar a caixa
 def empurrar_caixa_durante(supervisor, motor_esq, motor_dir, TIME_STEP, duracao_segundos=2):
     print("Empurrando a caixa...")
-    motor_esq.setVelocity(MOVER * MAX_VELOCIDADE)
-    motor_dir.setVelocity(MOVER * MAX_VELOCIDADE)
+    motor_esq.setVelocity(MAX_VELOCIDADE)
+    motor_dir.setVelocity(MAX_VELOCIDADE)
 
     steps_necessarios = int((1000 * duracao_segundos) / TIME_STEP)
     for _ in range(steps_necessarios):
         supervisor.step(TIME_STEP)
 
-    motor_esq.setVelocity(MOVER * 0.0)
-    motor_dir.setVelocity(MOVER * 0.0)
+    motor_esq.setVelocity(0.0)
+    motor_dir.setVelocity(0.0)
     print("Empurrão concluído.")
 
 
@@ -242,6 +260,56 @@ def encontrar_caixa_mais_proxima(robo_node, caixas_restantes):
             indice = i
 
     return indice, caixa_mais_proxima
+
+def identificar_e_girar_frente_a_caixa_leve(supervisor, robo_node, motor_esq, motor_dir, caixas, posicoes_iniciais, TIME_STEP, tolerancia=0.01):
+    import math
+
+    # Verifica quais caixas se moveram (leves)
+    caixas_leves = []
+    for i, caixa in enumerate(caixas):
+        nome = f"CAIXA_{i}"
+        pos_final = caixa.getPosition()
+        x0, y0 = posicoes_iniciais[nome]
+        xf, yf = pos_final[0], pos_final[1]
+        dist = math.sqrt((xf - x0)**2 + (yf - y0)**2)
+        if dist > tolerancia:
+            caixas_leves.append((i, caixa, dist))
+
+    if not caixas_leves:
+        print("Nenhuma caixa leve foi detectada.")
+        return
+
+    # Escolhe a mais leve (maior deslocamento)
+    caixas_leves.sort(key=lambda x: -x[2])
+    indice_leve, caixa_leve, _ = caixas_leves[0]
+    print(f"Voltando para a caixa leve: CAIXA_{indice_leve}")
+
+    # Navega até ela
+    while supervisor.step(TIME_STEP) != -1:
+        pos_robo = robo_node.getField("translation").getSFVec3f()
+        pos_caixa = caixa_leve.getPosition()
+        dx = pos_caixa[0] - pos_robo[0]
+        dy = pos_caixa[1] - pos_robo[1]
+        distancia = math.sqrt(dx**2 + dy**2)
+
+        if distancia < 0.12:
+            break
+
+        angulo_desejado = math.atan2(dy, dx)
+        rot_robo = robo_node.getField("rotation").getSFRotation()
+        angulo_atual = rot_robo[3] * (1 if rot_robo[1] >= 0 else -1)
+        erro = angulo_desejado - angulo_atual
+        erro = (erro + math.pi) % (2 * math.pi) - math.pi
+        ajuste = max(min(erro * 2.0, 6.28), -6.28)
+        motor_esq.setVelocity(max(min(3.0 - ajuste, 6.28), -6.28))
+        motor_dir.setVelocity(max(min(3.0 + ajuste, 6.28), -6.28))
+
+    # Para e gira em frente à caixa leve indefinidamente
+    print("Robo alinhado à caixa leve. Iniciando giro no lugar.")
+    while supervisor.step(TIME_STEP) != -1:
+        motor_esq.setVelocity(-2.0)
+        motor_dir.setVelocity(2.0)
+
 
 
 
@@ -277,6 +345,10 @@ while supervisor.step(TIME_STEP) != -1:
     if not caixas_restantes:
         print("Todas as caixas foram visitadas.")
         verificar_movimento_caixas(caixas, posicoes_iniciais)
+
+        identificar_e_girar_frente_a_caixa_leve(supervisor, robo_node, motor_esq, motor_dir,caixas, posicoes_iniciais, TIME_STEP)
+        break
+        
         break
 
     # Descobre a caixa mais próxima
