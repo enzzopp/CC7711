@@ -5,7 +5,10 @@ import random
 
 MAX_VELOCIDADE = 6.28
 TIME_STEP = 450
-NUM_CAIXAS = 3
+NUM_CAIXAS = 11
+TOLERANCIA_DISTANCIA = 0.10
+LIMITE_SENSOR = 80
+MOVER = 1
 
 # Função auxiliar para monitorar as posições em tempo real
 def imprimir_posicoes_caixas(caixas):
@@ -172,9 +175,6 @@ def controlar_movimento(robo_node, caixa_node, sensores, motor_esq, motor_dir, l
     motor_esq.setVelocity(vel_e)
     motor_dir.setVelocity(vel_d)
 
-
-
-
 # delay 
 def delay(supervisor, TIME_STEP, time_milisec=0):
 
@@ -261,6 +261,68 @@ def encontrar_caixa_mais_proxima(robo_node, caixas_restantes):
 
     return indice, caixa_mais_proxima
 
+def identificar_e_girar_frente_a_caixa_leve(supervisor, robo_node, motor_esq, motor_dir, caixas, posicoes_iniciais, TIME_STEP, tolerancia=0.01):
+    import math
+
+    # Verifica quais caixas se moveram (leves)
+    caixas_leves = []
+    for i, caixa in enumerate(caixas):
+        nome = f"CAIXA_{i}"
+        pos_final = caixa.getPosition()
+        x0, y0 = posicoes_iniciais[nome]
+        xf, yf = pos_final[0], pos_final[1]
+        dist = math.sqrt((xf - x0)**2 + (yf - y0)**2)
+        if dist > tolerancia:
+            caixas_leves.append((i, caixa, dist))
+
+    if not caixas_leves:
+        print("Nenhuma caixa leve foi detectada.")
+        return
+
+    # Escolhe a mais leve (maior deslocamento)
+    caixas_leves.sort(key=lambda x: -x[2])
+    indice_leve, caixa_leve, _ = caixas_leves[0]
+    print(f"Voltando para a caixa leve: CAIXA_{indice_leve}")
+
+    # Navega até ela
+    while supervisor.step(TIME_STEP) != -1:
+        pos_robo = robo_node.getField("translation").getSFVec3f()
+        pos_caixa = caixa_leve.getPosition()
+        dx = pos_caixa[0] - pos_robo[0]
+        dy = pos_caixa[1] - pos_robo[1]
+        distancia = math.sqrt(dx**2 + dy**2)
+
+        if distancia < 0.12:
+            break
+
+        angulo_desejado = math.atan2(dy, dx)
+        rot_robo = robo_node.getField("rotation").getSFRotation()
+        angulo_atual = rot_robo[3] * (1 if rot_robo[1] >= 0 else -1)
+        erro = angulo_desejado - angulo_atual
+        erro = (erro + math.pi) % (2 * math.pi) - math.pi
+        ajuste = max(min(erro * 2.0, 6.28), -6.28)
+        motor_esq.setVelocity(max(min(3.0 - ajuste, 6.28), -6.28))
+        motor_dir.setVelocity(max(min(3.0 + ajuste, 6.28), -6.28))
+
+    # Para e gira em frente à caixa leve indefinidamente
+    print("Robo alinhado à caixa leve. Iniciando giro no lugar.")
+    while supervisor.step(TIME_STEP) != -1:
+        motor_esq.setVelocity(-2.0)
+        motor_dir.setVelocity(2.0)
+
+
+def caixa_leve_detectada(caixas, posicoes_iniciais, tolerancia=0.01):
+    for i, caixa in enumerate(caixas):
+        nome = f"CAIXA_{i}"
+        pos_final = caixa.getPosition()
+        x0, y0 = posicoes_iniciais[nome]
+        xf, yf = pos_final[0], pos_final[1]
+        dist = math.sqrt((xf - x0)**2 + (yf - y0)**2)
+        if dist > tolerancia:
+            return True  # há pelo menos uma caixa leve detectada
+    return False
+
+
 
 
 # -------------------- EXECUÇÃO PRINCIPAL --------------------
@@ -295,8 +357,10 @@ while supervisor.step(TIME_STEP) != -1:
     if not caixas_restantes:
         print("Todas as caixas foram visitadas.")
         verificar_movimento_caixas(caixas, posicoes_iniciais)
-        break
 
+        identificar_e_girar_frente_a_caixa_leve(supervisor, robo_node, motor_esq, motor_dir,caixas, posicoes_iniciais, TIME_STEP)
+        break
+        
     # Descobre a caixa mais próxima
     indice_local, caixa_destino = encontrar_caixa_mais_proxima(robo_node, caixas_restantes)
 
@@ -310,7 +374,8 @@ while supervisor.step(TIME_STEP) != -1:
         # Remove a caixa visitada da lista
         caixas_restantes.pop(indice_local)
 
-        
-        
-
-
+        if caixa_leve_detectada(caixas, posicoes_iniciais):
+            print("Caixa leve detectada. Interrompendo busca e indo para ela.")
+            verificar_movimento_caixas(caixas, posicoes_iniciais)
+            identificar_e_girar_frente_a_caixa_leve(supervisor, robo_node, motor_esq, motor_dir, caixas, posicoes_iniciais, TIME_STEP)
+            break
